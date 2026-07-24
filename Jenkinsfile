@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'JDK21'
+        maven 'Maven3'
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code from SCM...'
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Compiling the project...'
+                sh 'mvn -B clean compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running unit tests...'
+                sh 'mvn -B test'
+            }
+            post {
+                always {
+                    junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                echo 'Packaging application into a JAR...'
+                sh 'mvn -B package -DskipTests'
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo 'Archiving build artifacts...'
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs above for details.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
